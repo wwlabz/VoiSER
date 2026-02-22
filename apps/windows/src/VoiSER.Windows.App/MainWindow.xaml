@@ -5,8 +5,8 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
-    Title="Настройки VoiSER (Windows)" KeyDown="OnWindowKeyDownCapture">
-    <ScrollViewer>
+    Title="Настройки VoiSER (Windows)">
+    <ScrollViewer KeyDown="OnWindowKeyDownCapture" IsTabStop="True">
         <Grid Padding="16" RowSpacing="12">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -105,7 +105,7 @@
             <Border Grid.Row="7" CornerRadius="14" BorderThickness="1" Padding="12" BorderBrush="#22AA0000" Background="#11AA0000">
                 <StackPanel Spacing="8">
                     <TextBlock Text="Лог / диагностика" FontSize="16" FontWeight="SemiBold" />
-                    <TextBox x:Name="LogBox" AcceptsReturn="True" MinHeight="180" TextWrapping="Wrap" IsReadOnly="True" VerticalScrollBarVisibility="Auto" />
+                    <TextBox x:Name="LogBox" AcceptsReturn="True" MinHeight="180" TextWrapping="Wrap" IsReadOnly="True" ScrollViewer.VerticalScrollBarVisibility="Auto" />
                 </StackPanel>
             </Border>
         </Grid>
