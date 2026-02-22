@@ -12,9 +12,8 @@ ALLOW_UNSIGNED_FALLBACK="${ALLOW_UNSIGNED_FALLBACK:-0}"
 MODEL_VARIANT="${MODEL_VARIANT:-openai_whisper-small}"
 INCLUDE_BUNDLED_MODEL="${INCLUDE_BUNDLED_MODEL:-0}"
 
-TRIPLE="$(swift -print-target-info | jq -r '.target.unversionedTriple')"
-BUILD_DIR="$ROOT_DIR/.build/$TRIPLE/$BUILD_CONFIG"
-BINARY_PATH="$BUILD_DIR/$APP_NAME"
+BUILD_DIR=""
+BINARY_PATH=""
 DIST_DIR="$ROOT_DIR/dist"
 APP_PATH="$DIST_DIR/$APP_NAME.app"
 STAGE_DIR="$(mktemp -d /tmp/${APP_NAME}.package.XXXXXX)"
@@ -40,7 +39,8 @@ else
 fi
 
 echo "[1/6] Building $APP_NAME ($BUILD_CONFIG)..."
-swift build -c "$BUILD_CONFIG" --product "$APP_NAME"
+BUILD_DIR="$(swift build -c "$BUILD_CONFIG" --product "$APP_NAME" --show-bin-path)"
+BINARY_PATH="$BUILD_DIR/$APP_NAME"
 
 if [[ ! -x "$BINARY_PATH" ]]; then
   echo "Unable to find built binary at $BINARY_PATH" >&2
