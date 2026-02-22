@@ -73,7 +73,12 @@ jobs:
           if (Test-Path $extract) { Remove-Item $extract -Recurse -Force }
           Expand-Archive -Path $portable -DestinationPath $extract -Force
 
-          $runtimeMarker = Join-Path $extract "Microsoft.WindowsAppRuntime.dll"
+          $launcher = Join-Path $extract "VoiSER.cmd"
+          if (!(Test-Path $launcher)) {
+            throw "Portable ZIP is missing top-level launcher VoiSER.cmd."
+          }
+
+          $runtimeMarker = Join-Path $extract "app/Microsoft.WindowsAppRuntime.dll"
           if (!(Test-Path $runtimeMarker)) {
             throw "Portable ZIP is missing Microsoft.WindowsAppRuntime.dll (self-contained runtime not included)."
           }

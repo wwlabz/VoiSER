@@ -10,6 +10,7 @@ VoiSER is a multi-platform voice input app with local transcription and smart te
 - All release notes: [GitHub Releases](https://github.com/wwlabz/VoiSER/releases/latest)
 
 Windows Portable artifact is built as self-contained (no separate Windows App Runtime install required).
+Portable archive root contains a single launcher file: `VoiSER.cmd` (binaries are inside `app/`).
 Windows MSIX zip contains the package and install notes. If release signing secrets are not configured, the zip also includes a temporary `VoiSER-signing.cer` certificate for sideload install.
 
 ## Repository Layout

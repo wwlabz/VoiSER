@@ -12,12 +12,16 @@ $out = Join-Path $root "artifacts"
 if (Test-Path $out) { Remove-Item $out -Recurse -Force }
 New-Item -ItemType Directory -Path $out | Out-Null
 
-$publishDir = Join-Path $out "portable"
-New-Item -ItemType Directory -Path $publishDir | Out-Null
+$buildPayloadDir = Join-Path $out "portable-build"
+$packageDir = Join-Path $out "portable"
+$appDir = Join-Path $packageDir "app"
+New-Item -ItemType Directory -Path $buildPayloadDir | Out-Null
+New-Item -ItemType Directory -Path $packageDir | Out-Null
+New-Item -ItemType Directory -Path $appDir | Out-Null
 
 $project = ".\\src\\VoiSER.Windows.App\\VoiSER.Windows.App.csproj"
 $exeName = "VoiSER.Windows.App.exe"
-$exePath = Join-Path $publishDir $exeName
+$buildExePath = Join-Path $buildPayloadDir $exeName
 
 function Resolve-MSBuildPath {
   $cmd = Get-Command msbuild -ErrorAction SilentlyContinue
@@ -120,13 +124,32 @@ if ($null -eq $buildExe) {
   throw "Portable package build failed: could not find $exeName under $buildOutputRoot"
 }
 
-Copy-Item -Path (Join-Path $buildExe.Directory.FullName "*") -Destination $publishDir -Recurse -Force
+Copy-Item -Path (Join-Path $buildExe.Directory.FullName "*") -Destination $buildPayloadDir -Recurse -Force
 
-if (-not (Test-Path $exePath)) {
-  throw "Portable self-contained build failed: $exePath was not produced."
+if (-not (Test-Path $buildExePath)) {
+  throw "Portable self-contained build failed: $buildExePath was not produced."
 }
 
-Compress-Archive -Path "$publishDir\*" -DestinationPath (Join-Path $out "VoiSER-Windows-portable.zip")
+Copy-Item -Path (Join-Path $buildPayloadDir "*") -Destination $appDir -Recurse -Force
+
+$launcherPath = Join-Path $packageDir "VoiSER.cmd"
+@"
+@echo off
+setlocal
+set "ROOT=%~dp0"
+start "" "%ROOT%app\VoiSER.Windows.App.exe" %*
+"@ | Out-File -FilePath $launcherPath -Encoding ascii
+
+$readmePath = Join-Path $packageDir "README-portable.txt"
+@"
+VoiSER Windows Portable
+
+1. Extract this ZIP to any folder.
+2. Launch VoiSER using VoiSER.cmd
+   (or run app\VoiSER.Windows.App.exe directly).
+"@ | Out-File -FilePath $readmePath -Encoding utf8
+
+Compress-Archive -Path "$packageDir\*" -DestinationPath (Join-Path $out "VoiSER-Windows-portable.zip")
 Write-Host "Portable ZIP created: $(Join-Path $out 'VoiSER-Windows-portable.zip')"
 
 # MSIX package is built in a dedicated release workflow step.
