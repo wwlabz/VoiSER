@@ -49,7 +49,7 @@ public partial class App : Application
         Current?.Exit();
     }
 
-    private void OnCurrentDomainUnhandledException(object? sender, UnhandledExceptionEventArgs e)
+    private void OnCurrentDomainUnhandledException(object? sender, System.UnhandledExceptionEventArgs e)
     {
         if (e.ExceptionObject is Exception ex)
         {
