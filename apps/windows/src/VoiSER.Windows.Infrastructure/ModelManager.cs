@@ -49,7 +49,9 @@ public sealed class ModelManager : IModelManager
             "base" => GgmlType.Base,
             "small" => GgmlType.Small,
             "medium" => GgmlType.Medium,
-            "large" => GgmlType.Large,
+            // Whisper.net 1.9 does not expose a Large enum variant.
+            // Keep "large" setting compatible by mapping to medium model.
+            "large" => GgmlType.Medium,
             _ => GgmlType.Small,
         };
     }
@@ -62,7 +64,7 @@ public sealed class ModelManager : IModelManager
             "base" => "base",
             "small" => "small",
             "medium" => "medium",
-            "large" => "large",
+            "large" => "medium",
             _ => "small",
         };
 
