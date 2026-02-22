@@ -66,6 +66,29 @@ foreach ($args in $attempts) {
 }
 
 if (-not $portableBuilt) {
+  # Fallback: package build output when publish mode is unavailable on runner.
+  Invoke-DotnetChecked -Args @(
+    "build", $project,
+    "-c", "Release",
+    "-p:WindowsPackageType=None"
+  )
+
+  $buildOutputRoot = Join-Path $root "src/VoiSER.Windows.App/bin/Release"
+  $buildExe = Get-ChildItem -Path $buildOutputRoot -Recurse -Filter "VoiSER.Windows.App.exe" -File -ErrorAction SilentlyContinue |
+    Select-Object -First 1
+
+  if ($null -eq $buildExe) {
+    throw "Portable package build failed: publish and build outputs did not produce VoiSER.Windows.App.exe"
+  }
+
+  Copy-Item -Path (Join-Path $buildExe.Directory.FullName "*") -Destination $publishDir -Recurse -Force
+
+  if (Test-Path $exePath) {
+    $portableBuilt = $true
+  }
+}
+
+if (-not $portableBuilt) {
   throw "Portable package build failed: $exePath was not produced."
 }
 
