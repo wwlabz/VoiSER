@@ -52,7 +52,7 @@ jobs:
         run: |
           Set-Location apps/windows
           dotnet restore src/VoiSER.Windows.App/VoiSER.Windows.App.csproj
-          dotnet build src/VoiSER.Windows.App/VoiSER.Windows.App.csproj -c Release -p:WindowsPackageType=None --no-restore
+          dotnet build src/VoiSER.Windows.App/VoiSER.Windows.App.csproj -c Release -p:WindowsPackageType=None -p:EnableMsixTooling=false -p:GenerateAppxPackageOnBuild=false --no-restore
 
       - name: Build portable zip
         shell: pwsh
