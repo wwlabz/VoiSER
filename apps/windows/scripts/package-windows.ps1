@@ -13,6 +13,23 @@ $project = ".\\src\\VoiSER.Windows.App\\VoiSER.Windows.App.csproj"
 $exeName = "VoiSER.Windows.App.exe"
 $exePath = Join-Path $publishDir $exeName
 
+function Resolve-MSBuildPath {
+  $cmd = Get-Command msbuild -ErrorAction SilentlyContinue
+  if ($null -ne $cmd -and -not [string]::IsNullOrWhiteSpace($cmd.Source)) {
+    return $cmd.Source
+  }
+
+  $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+  if (Test-Path $vswhere) {
+    $found = & $vswhere -latest -requires Microsoft.Component.MSBuild -find "MSBuild\\**\\Bin\\MSBuild.exe" 2>$null | Select-Object -First 1
+    if (-not [string]::IsNullOrWhiteSpace($found)) {
+      return $found
+    }
+  }
+
+  throw "MSBuild.exe not found. Ensure microsoft/setup-msbuild action ran before package script."
+}
+
 function Invoke-Checked {
   param(
     [Parameter(Mandatory = $true)]
@@ -57,7 +74,10 @@ function Invoke-Checked {
   }
 }
 
-Invoke-Checked -Command "msbuild" -Args @(
+$msbuildPath = Resolve-MSBuildPath
+Write-Host "Using MSBuild: $msbuildPath"
+
+Invoke-Checked -Command $msbuildPath -Args @(
   $project,
   "/restore",
   "/p:Configuration=Release",
