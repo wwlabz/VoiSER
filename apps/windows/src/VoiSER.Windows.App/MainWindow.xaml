@@ -5,33 +5,109 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
-    Title="VoiSER (Windows)">
-    <Grid Padding="20" RowDefinitions="Auto,Auto,Auto,Auto,*" RowSpacing="12">
-        <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button Content="Start / Stop" Click="OnToggleRecordingClick" />
-            <TextBlock x:Name="StateLabel" VerticalAlignment="Center" Text="State: Idle" />
-        </StackPanel>
+    Title="Настройки VoiSER (Windows)" KeyDown="OnWindowKeyDownCapture">
+    <ScrollViewer>
+        <Grid Padding="16" RowSpacing="12">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8">
-            <TextBlock VerticalAlignment="Center" Text="Output mode:" />
-            <ComboBox x:Name="OutputModeCombo" Width="220" SelectionChanged="OnOutputModeChanged">
-                <ComboBoxItem Tag="Clipboard" Content="Clipboard" />
-                <ComboBoxItem Tag="PasteAtCursor" Content="Paste to active field" />
-                <ComboBoxItem Tag="PasteStrict" Content="Strict paste" />
-            </ComboBox>
-        </StackPanel>
+            <StackPanel Grid.Row="0" Spacing="4">
+                <TextBlock Text="Настройки VoiSER" FontSize="22" FontWeight="Bold" />
+                <TextBlock Text="Внешний вид, распознавание и способ вывода текста" Opacity="0.75" />
+            </StackPanel>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8">
-            <CheckBox x:Name="SingleKeyEnabled" Content="Single-key exclusive mode" Checked="OnSingleKeyConfigChanged" Unchecked="OnSingleKeyConfigChanged" />
-            <CheckBox x:Name="SingleKeyBlock" Content="Block key in other apps" IsChecked="True" Checked="OnSingleKeyConfigChanged" Unchecked="OnSingleKeyConfigChanged" />
-        </StackPanel>
+            <Border Grid.Row="1" CornerRadius="14" BorderThickness="1" Padding="12" BorderBrush="#22000000" Background="#11000000">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Управление" FontSize="16" FontWeight="SemiBold" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="Начать запись" Click="OnToggleRecordingClick" />
+                        <TextBlock x:Name="StateLabel" VerticalAlignment="Center" Text="Состояние: Idle" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock VerticalAlignment="Center" Text="Комбо хоткей (VK):" Width="150" />
+                        <NumberBox x:Name="ComboKeyCode" Width="100" Minimum="1" Maximum="255" Value="32" ValueChanged="OnComboKeyCodeChanged" />
+                        <CheckBox x:Name="ComboAlt" Content="Alt" IsChecked="True" Checked="OnComboModifiersChanged" Unchecked="OnComboModifiersChanged" />
+                        <CheckBox x:Name="ComboCtrl" Content="Ctrl" Checked="OnComboModifiersChanged" Unchecked="OnComboModifiersChanged" />
+                        <CheckBox x:Name="ComboShift" Content="Shift" Checked="OnComboModifiersChanged" Unchecked="OnComboModifiersChanged" />
+                        <CheckBox x:Name="ComboWin" Content="Win" Checked="OnComboModifiersChanged" Unchecked="OnComboModifiersChanged" />
+                    </StackPanel>
+                    <TextBlock Text="Глобальная комбинация и режим одной клавиши работают одновременно, как на macOS." Opacity="0.7" TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
 
-        <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8">
-            <TextBlock VerticalAlignment="Center" Text="Single key code:" />
-            <NumberBox x:Name="SingleKeyCode" Width="120" Minimum="1" Maximum="255" Value="32" ValueChanged="OnSingleKeyCodeChanged" />
-            <TextBlock VerticalAlignment="Center" Text="(physical key code)" />
-        </StackPanel>
+            <Border Grid.Row="2" CornerRadius="14" BorderThickness="1" Padding="12" BorderBrush="#22000000" Background="#11000000">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Вывод текста" FontSize="16" FontWeight="SemiBold" />
+                    <RadioButtons x:Name="OutputModes" SelectionChanged="OnOutputModeChanged">
+                        <x:String>Копировать в буфер</x:String>
+                        <x:String>Вставлять в активное поле</x:String>
+                        <x:String>Только вставка (строго)</x:String>
+                    </RadioButtons>
+                </StackPanel>
+            </Border>
 
-        <TextBox Grid.Row="4" x:Name="LogBox" AcceptsReturn="True" TextWrapping="Wrap" IsReadOnly="True" VerticalScrollBarVisibility="Auto" />
-    </Grid>
+            <Border Grid.Row="3" CornerRadius="14" BorderThickness="1" Padding="12" BorderBrush="#22000000" Background="#11000000">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Распознавание" FontSize="16" FontWeight="SemiBold" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock VerticalAlignment="Center" Text="Модель Whisper:" Width="120" />
+                        <ComboBox x:Name="ModelVariantCombo" Width="180" SelectionChanged="OnModelVariantChanged">
+                            <ComboBoxItem Content="tiny" />
+                            <ComboBoxItem Content="base" />
+                            <ComboBoxItem Content="small" />
+                            <ComboBoxItem Content="medium" />
+                        </ComboBox>
+                        <Button Content="Установить / обновить модель" Click="OnPrepareModelClick" />
+                    </StackPanel>
+                    <ProgressBar x:Name="ModelProgress" Minimum="0" Maximum="1" Value="0" Height="8" />
+                    <TextBlock x:Name="ModelMessage" Text="Ожидание установки модели" Opacity="0.75" />
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="4" CornerRadius="14" BorderThickness="1" Padding="12" BorderBrush="#22000000" Background="#11000000">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Режим одной клавиши" FontSize="16" FontWeight="SemiBold" />
+                    <CheckBox x:Name="SingleKeyEnabled" Content="Включить режим одной клавиши" Checked="OnSingleKeyConfigChanged" Unchecked="OnSingleKeyConfigChanged" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock VerticalAlignment="Center" Text="Клавиша:" Width="120" />
+                        <Button x:Name="CaptureKeyButton" Content="Нажмите клавишу…" Click="OnCaptureKeyClick" />
+                        <TextBlock x:Name="SingleKeyLabel" VerticalAlignment="Center" Text="SC-32" />
+                    </StackPanel>
+                    <CheckBox x:Name="SingleKeyBlock" Content="Блокировать эту клавишу в других приложениях" IsChecked="True" Checked="OnSingleKeyConfigChanged" Unchecked="OnSingleKeyConfigChanged" />
+                    <TextBlock Text="Привязка идет по физической клавише (scan code), независимо от раскладки." Opacity="0.75" TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="5" CornerRadius="14" BorderThickness="1" Padding="12" BorderBrush="#22000000" Background="#11000000">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Поведение приложения" FontSize="16" FontWeight="SemiBold" />
+                    <CheckBox x:Name="LaunchAtStartup" Content="Запускать при входе в систему" Checked="OnBehaviorChanged" Unchecked="OnBehaviorChanged" />
+                    <CheckBox x:Name="WidgetEnabled" Content="Показывать виджет (Windows shell state)" Checked="OnBehaviorChanged" Unchecked="OnBehaviorChanged" />
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="6" CornerRadius="14" BorderThickness="1" Padding="12" BorderBrush="#22000000" Background="#11000000">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Обслуживание" FontSize="16" FontWeight="SemiBold" />
+                    <Button Content="Проверить разрешения вставки" Click="OnCheckPermissionsClick" />
+                    <Button Content="Переинициализировать модель" Click="OnReinitializeModelClick" />
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="7" CornerRadius="14" BorderThickness="1" Padding="12" BorderBrush="#22AA0000" Background="#11AA0000">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Лог / диагностика" FontSize="16" FontWeight="SemiBold" />
+                    <TextBox x:Name="LogBox" AcceptsReturn="True" MinHeight="180" TextWrapping="Wrap" IsReadOnly="True" VerticalScrollBarVisibility="Auto" />
+                </StackPanel>
+            </Border>
+        </Grid>
+    </ScrollViewer>
 </Window>

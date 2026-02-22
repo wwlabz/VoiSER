@@ -1,11 +1,10 @@
+using Whisper.net.Ggml;
 using VoiSER.Windows.Core;
 
 namespace VoiSER.Windows.Infrastructure;
 
 public sealed class ModelManager : IModelManager
 {
-    private static readonly HttpClient Http = new();
-
     public string ModelDirectory(string variant)
     {
         return Path.Combine(
@@ -21,23 +20,52 @@ public sealed class ModelManager : IModelManager
         var dir = ModelDirectory(variant);
         Directory.CreateDirectory(dir);
 
-        var markerFile = Path.Combine(dir, ".model-ready");
-        if (File.Exists(markerFile))
+        var modelFile = Path.Combine(dir, ModelFileName(variant));
+        if (File.Exists(modelFile))
         {
-            progress?.Report((1, "Model ready"));
+            progress?.Report((1, "Модель готова"));
             return;
         }
 
-        progress?.Report((0.1, "Preparing local model directory"));
+        progress?.Report((0.05, "Подготовка загрузки модели"));
 
-        // Placeholder bootstrap for v1 structure.
-        // Real model composition/weights can be added without changing app contracts.
-        var readmePath = Path.Combine(dir, "README.txt");
-        await File.WriteAllTextAsync(readmePath,
-            "Model bootstrap placeholder. Integrate full whisper.cpp model assets in packaging pipeline.",
-            cancellationToken);
+        var ggmlType = ModelType(variant);
+        await using var modelStream = await WhisperGgmlDownloader.Default.GetGgmlModelAsync(ggmlType);
 
-        await File.WriteAllTextAsync(markerFile, DateTimeOffset.UtcNow.ToString("O"), cancellationToken);
-        progress?.Report((1, "Model ready"));
+        progress?.Report((0.2, "Загрузка локальной модели Whisper"));
+
+        await using var fileWriter = File.OpenWrite(modelFile);
+        await modelStream.CopyToAsync(fileWriter, cancellationToken);
+        await fileWriter.FlushAsync(cancellationToken);
+
+        progress?.Report((1, "Модель готова"));
+    }
+
+    private static GgmlType ModelType(string variant)
+    {
+        return variant.ToLowerInvariant() switch
+        {
+            "tiny" => GgmlType.Tiny,
+            "base" => GgmlType.Base,
+            "small" => GgmlType.Small,
+            "medium" => GgmlType.Medium,
+            "large" => GgmlType.Large,
+            _ => GgmlType.Small,
+        };
+    }
+
+    private static string ModelFileName(string variant)
+    {
+        var suffix = variant.ToLowerInvariant() switch
+        {
+            "tiny" => "tiny",
+            "base" => "base",
+            "small" => "small",
+            "medium" => "medium",
+            "large" => "large",
+            _ => "small",
+        };
+
+        return $"ggml-{suffix}.bin";
     }
 }

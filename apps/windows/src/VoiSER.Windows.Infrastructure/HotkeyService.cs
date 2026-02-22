@@ -10,15 +10,21 @@ public sealed class HotkeyService : IHotkeyService
     private readonly object _sync = new();
     private IntPtr _hookHandle = IntPtr.Zero;
     private LowLevelKeyboardProc? _hookProc;
+
+    private HotkeyCombo _combo = new(0x20, HotkeyModifiers.Alt);
     private bool _singleKeyEnabled;
     private int _singleKeyCode;
     private bool _singleKeyBlock;
 
+    private readonly HashSet<uint> _pressedKeys = [];
+
     public bool ConfigureCombo(HotkeyCombo combo)
     {
-        // v1 scaffold: combo registration is represented by contract and can be routed via RegisterHotKey host window.
-        // Returning true keeps app flow stable while single-key hook is fully implemented.
-        return true;
+        lock (_sync)
+        {
+            _combo = combo;
+            return EnsureHook();
+        }
     }
 
     public bool ConfigureSingleKey(int keyCode, bool enabled, bool blockSystemDelivery)
@@ -29,7 +35,7 @@ public sealed class HotkeyService : IHotkeyService
             _singleKeyEnabled = enabled;
             _singleKeyBlock = blockSystemDelivery;
 
-            if (!enabled)
+            if (!enabled && _combo.Modifiers == HotkeyModifiers.None && _combo.KeyCode == 0)
             {
                 UninstallHook();
                 return true;
@@ -61,32 +67,66 @@ public sealed class HotkeyService : IHotkeyService
         UnhookWindowsHookEx(_hookHandle);
         _hookHandle = IntPtr.Zero;
         _hookProc = null;
+        _pressedKeys.Clear();
     }
 
     private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
     {
-        if (nCode >= 0 && _singleKeyEnabled)
+        if (nCode < 0)
         {
-            var msg = wParam.ToInt32();
-            if (msg == 0x0100) // WM_KEYDOWN
-            {
-                var info = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
-                if ((int)info.vkCode == _singleKeyCode)
-                {
-                    if ((info.flags & 0x4000u) == 0) // no LLKHF_UP
-                    {
-                        Triggered?.Invoke();
-                    }
+            return CallNextHookEx(_hookHandle, nCode, wParam, lParam);
+        }
 
-                    if (_singleKeyBlock)
-                    {
-                        return (IntPtr)1;
-                    }
-                }
+        var msg = wParam.ToInt32();
+        var info = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
+
+        if (msg == 0x0100) // WM_KEYDOWN
+        {
+            var wasPressed = !_pressedKeys.Add(info.vkCode);
+            var triggerSingle = _singleKeyEnabled && (int)info.scanCode == _singleKeyCode;
+            var triggerCombo = MatchesCombo((int)info.vkCode);
+
+            if (!wasPressed && (triggerSingle || triggerCombo))
+            {
+                Triggered?.Invoke();
             }
+
+            if (triggerSingle && _singleKeyBlock)
+            {
+                return (IntPtr)1;
+            }
+        }
+        else if (msg == 0x0101) // WM_KEYUP
+        {
+            _pressedKeys.Remove(info.vkCode);
         }
 
         return CallNextHookEx(_hookHandle, nCode, wParam, lParam);
+    }
+
+    private bool MatchesCombo(int keyCode)
+    {
+        if (_combo.KeyCode != keyCode)
+        {
+            return false;
+        }
+
+        bool alt = IsModifierDown(0x12);
+        bool ctrl = IsModifierDown(0x11);
+        bool shift = IsModifierDown(0x10);
+        bool win = IsModifierDown(0x5B) || IsModifierDown(0x5C);
+
+        if (_combo.Modifiers.HasFlag(HotkeyModifiers.Alt) != alt) return false;
+        if (_combo.Modifiers.HasFlag(HotkeyModifiers.Control) != ctrl) return false;
+        if (_combo.Modifiers.HasFlag(HotkeyModifiers.Shift) != shift) return false;
+        if (_combo.Modifiers.HasFlag(HotkeyModifiers.Win) != win) return false;
+
+        return true;
+    }
+
+    private static bool IsModifierDown(int virtualKey)
+    {
+        return (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
     }
 
     private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
@@ -109,4 +149,7 @@ public sealed class HotkeyService : IHotkeyService
 
     [DllImport("user32.dll")]
     private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int vKey);
 }

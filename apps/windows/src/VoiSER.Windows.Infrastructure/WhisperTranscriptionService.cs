@@ -1,3 +1,4 @@
+using Whisper.net;
 using VoiSER.Windows.Core;
 
 namespace VoiSER.Windows.Infrastructure;
@@ -17,9 +18,29 @@ public sealed class WhisperTranscriptionService : ITranscriptionService
     {
         await _modelManager.EnsureModelReadyAsync(_modelVariant, cancellationToken: cancellationToken);
 
-        // v1 scaffold: local whisper.cpp runtime wiring is prepared through dependencies and storage conventions.
-        // Replace this placeholder with actual whisper.net inference invocation in next iteration.
-        var text = $"[transcribed-local] {Path.GetFileNameWithoutExtension(audioFilePath)}";
-        return new TranscriptionResult(text, "en", 0);
+        var modelPath = Path.Combine(_modelManager.ModelDirectory(_modelVariant), $"ggml-{_modelVariant.ToLowerInvariant()}.bin");
+        if (!File.Exists(modelPath))
+        {
+            throw new FileNotFoundException("Whisper model file missing", modelPath);
+        }
+
+        using var whisperFactory = WhisperFactory.FromPath(modelPath);
+        using var processor = whisperFactory.CreateBuilder()
+            .WithLanguage("auto")
+            .Build();
+
+        await using var fileStream = File.OpenRead(audioFilePath);
+
+        var segments = new List<string>();
+        await foreach (var result in processor.ProcessAsync(fileStream, cancellationToken))
+        {
+            if (!string.IsNullOrWhiteSpace(result.Text))
+            {
+                segments.Add(result.Text.Trim());
+            }
+        }
+
+        var text = string.Join(" ", segments).Trim();
+        return new TranscriptionResult(text, "auto", 0);
     }
 }
