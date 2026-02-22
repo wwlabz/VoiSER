@@ -39,6 +39,8 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      - uses: microsoft/setup-msbuild@v2
+
       - name: Restore and test
         continue-on-error: true
         shell: pwsh
@@ -51,8 +53,7 @@ jobs:
         shell: pwsh
         run: |
           Set-Location apps/windows
-          dotnet restore src/VoiSER.Windows.App/VoiSER.Windows.App.csproj
-          dotnet build src/VoiSER.Windows.App/VoiSER.Windows.App.csproj -c Release -p:WindowsPackageType=None -p:EnableMsixTooling=false -p:GenerateAppxPackageOnBuild=false --no-restore
+          msbuild .\src\VoiSER.Windows.App\VoiSER.Windows.App.csproj /t:Restore,Build /p:Configuration=Release /p:Platform=x64 /p:WindowsPackageType=None /p:EnableMsixTooling=false /p:GenerateAppxPackageOnBuild=false
 
       - name: Build portable zip
         shell: pwsh
