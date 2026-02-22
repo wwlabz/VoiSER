@@ -2,6 +2,13 @@
 
 VoiSER is a multi-platform voice input app with local transcription and smart text output.
 
+## Download
+
+- macOS (latest): [Download VoiSER-macOS.zip](https://github.com/wwlabz/VoiSER/releases/latest/download/VoiSER-macOS.zip)
+- Windows Portable (latest): [Download VoiSER-Windows-portable.zip](https://github.com/wwlabz/VoiSER/releases/latest/download/VoiSER-Windows-portable.zip)
+- Windows MSIX (latest): [Download VoiSER-Windows-msix.zip](https://github.com/wwlabz/VoiSER/releases/latest/download/VoiSER-Windows-msix.zip)
+- All release notes: [GitHub Releases](https://github.com/wwlabz/VoiSER/releases/latest)
+
 ## Repository Layout
 
 - `apps/macos` — production macOS app (Swift + AppKit/SwiftUI + WhisperKit)
@@ -27,13 +34,20 @@ dotnet restore
 dotnet test
 ```
 
-## Downloads
+## Versioning and Releases
 
-Artifacts are published in GitHub Releases:
+- Release artifacts are published on tag push `v*` via GitHub Actions.
+- To publish a new version:
 
-- macOS app package
-- Windows MSIX package
-- Windows portable ZIP
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+- The workflow will attach:
+  - `VoiSER-macOS.zip`
+  - `VoiSER-Windows-portable.zip`
+  - `VoiSER-Windows-msix.zip`
 
 ## CI/CD
 
@@ -44,6 +58,7 @@ Artifacts are published in GitHub Releases:
 
 - `docs/install-macos.md`
 - `docs/install-windows.md`
+- `docs/releases.md`
 - `docs/permissions.md`
 - `docs/architecture.md`
 
