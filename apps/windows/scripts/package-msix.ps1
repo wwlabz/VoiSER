@@ -86,10 +86,12 @@ New-Item -ItemType Directory -Path $zipPayloadDir | Out-Null
 $project = ".\\src\\VoiSER.Windows.App\\VoiSER.Windows.App.csproj"
 $pfxPath = Join-Path $msixOutDir "voiser-signing.pfx"
 $cerPath = Join-Path $msixOutDir "VoiSER-signing.cer"
-$generatedCertThumbprint = $null
+$signingThumbprint = $null
+$certStoreThumbprintsToCleanup = @()
 
 $certPassword = $env:WINDOWS_PFX_PASSWORD
 $usingProvidedPfx = -not [string]::IsNullOrWhiteSpace($env:WINDOWS_PFX_BASE64)
+$signingCertSubject = $null
 
 if ($usingProvidedPfx) {
   if ([string]::IsNullOrWhiteSpace($certPassword)) {
@@ -99,34 +101,42 @@ if ($usingProvidedPfx) {
   Write-Host "Using signing certificate from repository secret WINDOWS_PFX_BASE64."
   [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:WINDOWS_PFX_BASE64))
 
-  try {
-    $pfxCert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($pfxPath, $certPassword, [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable)
-    [IO.File]::WriteAllBytes($cerPath, $pfxCert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Cert))
+  $securePassword = ConvertTo-SecureString -AsPlainText $certPassword -Force
+  $importedCert = Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation "Cert:\CurrentUser\My" -Password $securePassword
+  if ($null -eq $importedCert) {
+    throw "Could not import certificate from WINDOWS_PFX_BASE64."
   }
-  catch {
-    Write-Warning "Could not export CER from provided PFX: $($_.Exception.Message)"
-  }
+  $signingThumbprint = $importedCert.Thumbprint
+  $signingCertSubject = $importedCert.Subject
+  $certStoreThumbprintsToCleanup += $signingThumbprint
+  Export-Certificate -Cert $importedCert -FilePath $cerPath | Out-Null
 }
 else {
-  if ([string]::IsNullOrWhiteSpace($certPassword)) {
-    $certPassword = "voiser-ci-" + [Guid]::NewGuid().ToString("N")
-  }
-
   Write-Warning "WINDOWS_PFX_BASE64 is not set. Generating temporary self-signed certificate for this build."
-  $securePassword = ConvertTo-SecureString -AsPlainText $certPassword -Force
   $cert = New-SelfSignedCertificate `
     -Type Custom `
     -Subject "CN=wwlabz" `
     -KeyAlgorithm RSA `
     -KeyLength 2048 `
     -HashAlgorithm SHA256 `
+    -KeyUsage DigitalSignature `
     -KeyExportPolicy Exportable `
     -CertStoreLocation "Cert:\CurrentUser\My" `
+    -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3") `
     -NotAfter (Get-Date).AddYears(2)
 
-  $generatedCertThumbprint = $cert.Thumbprint
-  Export-PfxCertificate -Cert $cert -FilePath $pfxPath -Password $securePassword | Out-Null
+  $signingThumbprint = $cert.Thumbprint
+  $signingCertSubject = $cert.Subject
+  $certStoreThumbprintsToCleanup += $signingThumbprint
   Export-Certificate -Cert $cert -FilePath $cerPath | Out-Null
+}
+
+if ([string]::IsNullOrWhiteSpace($signingThumbprint)) {
+  throw "Signing certificate thumbprint is empty."
+}
+
+if ($null -eq $signingCertSubject -or $signingCertSubject -notmatch "CN=wwlabz") {
+  throw "Signing certificate subject '$signingCertSubject' does not match manifest publisher 'CN=wwlabz'."
 }
 
 $msbuildPath = Resolve-MSBuildPath
@@ -143,9 +153,9 @@ Invoke-Checked -Command $msbuildPath -Args @(
   "/p:UapAppxPackageBuildMode=SideloadOnly",
   "/p:AppxPackageDir=$($msixOutDir)\",
   "/p:AppxPackageSigningEnabled=true",
-  "/p:PackageCertificateThumbprint=",
-  "/p:PackageCertificateKeyFile=$pfxPath",
-  "/p:PackageCertificatePassword=$certPassword"
+  "/p:PackageCertificateThumbprint=$signingThumbprint",
+  "/p:PackageCertificateKeyFile=",
+  "/p:PackageCertificatePassword="
 )
 
 $msixFile = Get-ChildItem -Path $msixOutDir -Recurse -Include *.msix,*.appx,*.msixbundle -File -ErrorAction SilentlyContinue |
@@ -181,10 +191,12 @@ if (Test-Path $msixZipPath) { Remove-Item $msixZipPath -Force }
 Compress-Archive -Path "$zipPayloadDir\*" -DestinationPath $msixZipPath -Force
 Write-Host "MSIX ZIP created: $msixZipPath"
 
-if ($generatedCertThumbprint) {
-  $certStorePath = "Cert:\CurrentUser\My\$generatedCertThumbprint"
-  if (Test-Path $certStorePath) {
-    Remove-Item $certStorePath -Force
+foreach ($thumbprint in $certStoreThumbprintsToCleanup) {
+  if (-not [string]::IsNullOrWhiteSpace($thumbprint)) {
+    $certStorePath = "Cert:\CurrentUser\My\$thumbprint"
+    if (Test-Path $certStorePath) {
+      Remove-Item $certStorePath -Force
+    }
   }
 }
 
