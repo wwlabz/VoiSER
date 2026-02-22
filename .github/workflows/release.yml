@@ -49,82 +49,11 @@ jobs:
           dotnet restore tests/VoiSER.Windows.Tests/VoiSER.Windows.Tests.csproj
           dotnet test tests/VoiSER.Windows.Tests/VoiSER.Windows.Tests.csproj -c Release --no-restore
 
-      - name: Build Windows app
-        shell: pwsh
-        run: |
-          try {
-            Set-Location apps/windows
-            $artifacts = Join-Path (Get-Location) "artifacts"
-            New-Item -ItemType Directory -Force -Path $artifacts | Out-Null
-
-            $log = Join-Path $artifacts "build-windows.log"
-            if (Test-Path $log) {
-              Remove-Item -Force $log
-            }
-
-            & msbuild .\src\VoiSER.Windows.App\VoiSER.Windows.App.csproj /t:Restore,Build /p:Configuration=Release /p:Platform=x64 /p:WindowsPackageType=None /p:EnableMsixTooling=false /p:GenerateAppxPackageOnBuild=false *>&1 | Tee-Object -FilePath $log
-            $exitCode = $LASTEXITCODE
-
-            if ($exitCode -ne 0) {
-              $interesting = @()
-              if (Test-Path $log) {
-                $interesting = Get-Content $log |
-                  Select-String -Pattern 'error|failed|MSB[0-9]{4}|NU[0-9]{4}' -CaseSensitive:$false |
-                  Select-Object -ExpandProperty Line -First 40
-
-                if ($null -eq $interesting -or $interesting.Count -eq 0) {
-                  $interesting = Get-Content $log -Tail 40
-                }
-              }
-
-              if ($null -eq $interesting -or $interesting.Count -eq 0) {
-                $interesting = @("Build Windows app failed with exit code $exitCode and empty log output")
-              }
-
-              foreach ($line in $interesting) {
-                $msg = $line.ToString().Replace("`r", " ").Replace("`n", " ")
-                Write-Host "::error title=Build Windows app::$msg"
-              }
-
-              throw "Build Windows app failed with exit code $exitCode"
-            }
-          }
-          catch {
-            $err = $_.Exception.Message
-            Write-Host "::error title=Build Windows app exception::$err"
-            throw
-          }
-
       - name: Build portable zip
         shell: pwsh
         run: |
           Set-Location apps/windows
-
-          $artifacts = Join-Path (Get-Location) "artifacts"
-          New-Item -ItemType Directory -Force -Path $artifacts | Out-Null
-
-          $portableDir = Join-Path $artifacts "portable"
-          if (Test-Path $portableDir) {
-            Remove-Item -Recurse -Force $portableDir
-          }
-          New-Item -ItemType Directory -Path $portableDir | Out-Null
-
-          $buildRoot = Join-Path (Get-Location) "src/VoiSER.Windows.App/bin/Release"
-          $exe = Get-ChildItem -Path $buildRoot -Recurse -Filter "VoiSER.Windows.App.exe" -File -ErrorAction SilentlyContinue |
-            Sort-Object LastWriteTime -Descending |
-            Select-Object -First 1
-
-          if ($null -eq $exe) {
-            throw "Built app executable was not found under $buildRoot"
-          }
-
-          Copy-Item -Path (Join-Path $exe.Directory.FullName "*") -Destination $portableDir -Recurse -Force
-
-          $portableZip = Join-Path $artifacts "VoiSER-Windows-portable.zip"
-          if (Test-Path $portableZip) {
-            Remove-Item -Force $portableZip
-          }
-          Compress-Archive -Path (Join-Path $portableDir "*") -DestinationPath $portableZip
+          ./scripts/package-windows.ps1
 
       - name: Validate portable zip
         shell: pwsh
