@@ -19,9 +19,36 @@ function Invoke-DotnetChecked {
     [string[]]$Args
   )
 
-  & dotnet @Args
-  if ($LASTEXITCODE -ne 0) {
-    throw "dotnet command failed: dotnet $($Args -join ' ')"
+  $output = & dotnet @Args 2>&1
+  $exitCode = $LASTEXITCODE
+
+  if ($null -ne $output) {
+    $output | ForEach-Object { Write-Host $_ }
+  }
+
+  if ($exitCode -ne 0) {
+    $interesting = @()
+
+    if ($null -ne $output) {
+      $interesting = $output |
+        Select-String -Pattern 'error|failed|MSB[0-9]{4}|NU[0-9]{4}' -CaseSensitive:$false |
+        Select-Object -ExpandProperty Line -First 30
+
+      if ($null -eq $interesting -or $interesting.Count -eq 0) {
+        $interesting = $output | Select-Object -Last 30
+      }
+    }
+
+    if ($null -eq $interesting -or $interesting.Count -eq 0) {
+      $interesting = @("dotnet command failed without output")
+    }
+
+    foreach ($line in $interesting) {
+      $msg = $line.ToString().Replace("`r", " ").Replace("`n", " ")
+      Write-Host "::error title=Windows package::$msg"
+    }
+
+    throw "dotnet command failed (exit $exitCode): dotnet $($Args -join ' ')"
   }
 }
 
@@ -35,6 +62,8 @@ $attempts = @(
     "--self-contained", "true",
     "-p:WindowsPackageType=None",
     "-p:WindowsAppSDKSelfContained=true",
+    "-p:EnableMsixTooling=false",
+    "-p:GenerateAppxPackageOnBuild=false",
     "-o", $publishDir
   ),
   @(
@@ -43,6 +72,8 @@ $attempts = @(
     "-r", "win-x64",
     "--self-contained", "false",
     "-p:WindowsPackageType=None",
+    "-p:EnableMsixTooling=false",
+    "-p:GenerateAppxPackageOnBuild=false",
     "-o", $publishDir
   )
 )
@@ -70,7 +101,9 @@ if (-not $portableBuilt) {
   Invoke-DotnetChecked -Args @(
     "build", $project,
     "-c", "Release",
-    "-p:WindowsPackageType=None"
+    "-p:WindowsPackageType=None",
+    "-p:EnableMsixTooling=false",
+    "-p:GenerateAppxPackageOnBuild=false"
   )
 
   $buildOutputRoot = Join-Path $root "src/VoiSER.Windows.App/bin/Release"
