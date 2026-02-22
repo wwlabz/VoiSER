@@ -69,48 +69,49 @@ jobs:
             throw "Portable ZIP is unexpectedly small ($size bytes), aborting release."
           }
 
-      - name: Build MSIX (best effort)
-        if: always()
-        continue-on-error: true
+      - name: Build MSIX package
+        shell: pwsh
+        env:
+          WINDOWS_PFX_BASE64: ${{ secrets.WINDOWS_PFX_BASE64 }}
+          WINDOWS_PFX_PASSWORD: ${{ secrets.WINDOWS_PFX_PASSWORD }}
+        run: |
+          Set-Location apps/windows
+          ./scripts/package-msix.ps1
+
+      - name: Validate MSIX zip
         shell: pwsh
         run: |
           Set-Location apps/windows
-          $out = Join-Path (Get-Location) "artifacts/msix"
-          New-Item -ItemType Directory -Force -Path $out | Out-Null
-
-          dotnet msbuild .\src\VoiSER.Windows.App\VoiSER.Windows.App.csproj /t:Restore,Build /p:Configuration=Release /p:GenerateAppxPackageOnBuild=true /p:AppxBundle=Never /p:AppxPackageDir="$out\\" || $true
-
-          $msix = Get-ChildItem -Path $out -Recurse -Include *.msix,*.appx -ErrorAction SilentlyContinue | Select-Object -First 1
-          if ($null -ne $msix) {
-            Compress-Archive -Path $msix.FullName -DestinationPath (Join-Path (Get-Location) "artifacts/VoiSER-Windows-msix.zip") -Force
-          }
-          else {
-            "MSIX build artifact was not produced on this runner." | Out-File -Encoding utf8 (Join-Path (Get-Location) "artifacts/MSIX-NOTICE.txt")
-            Compress-Archive -Path (Join-Path (Get-Location) "artifacts/MSIX-NOTICE.txt") -DestinationPath (Join-Path (Get-Location) "artifacts/VoiSER-Windows-msix.zip") -Force
-          }
-
-      - name: Ensure MSIX zip exists
-        if: always()
-        shell: pwsh
-        run: |
-          Set-Location apps/windows
-          $artifacts = Join-Path (Get-Location) "artifacts"
-          New-Item -ItemType Directory -Force -Path $artifacts | Out-Null
           $msixZip = Join-Path (Get-Location) "artifacts/VoiSER-Windows-msix.zip"
           if (!(Test-Path $msixZip)) {
-            "MSIX package was not produced on this runner." | Out-File -Encoding utf8 (Join-Path (Get-Location) "artifacts/MSIX-NOTICE.txt")
-            Compress-Archive -Path (Join-Path (Get-Location) "artifacts/MSIX-NOTICE.txt") -DestinationPath $msixZip -Force
+            throw "MSIX ZIP was not produced: $msixZip"
+          }
+
+          $zipSize = (Get-Item $msixZip).Length
+          if ($zipSize -lt 51200) {
+            throw "MSIX ZIP is unexpectedly small ($zipSize bytes), aborting release."
+          }
+
+          $extract = Join-Path $env:RUNNER_TEMP "msix-validate"
+          if (Test-Path $extract) { Remove-Item $extract -Recurse -Force }
+          Expand-Archive -Path $msixZip -DestinationPath $extract -Force
+
+          $msix = Get-ChildItem -Path $extract -Recurse -Include *.msix,*.appx,*.msixbundle -File -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($null -eq $msix) {
+            throw "MSIX ZIP does not contain a real package file (*.msix/*.appx/*.msixbundle)."
+          }
+
+          if ($msix.Length -lt 102400) {
+            throw "MSIX package is unexpectedly small ($($msix.Length) bytes), aborting release."
           }
 
       - name: Upload Windows portable artifact
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: VoiSER-Windows-portable
           path: apps/windows/artifacts/VoiSER-Windows-portable.zip
 
       - name: Upload Windows msix artifact
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: VoiSER-Windows-msix

@@ -9,6 +9,8 @@ VoiSER is a multi-platform voice input app with local transcription and smart te
 - Windows MSIX (latest): [Download VoiSER-Windows-msix.zip](https://github.com/wwlabz/VoiSER/releases/latest/download/VoiSER-Windows-msix.zip)
 - All release notes: [GitHub Releases](https://github.com/wwlabz/VoiSER/releases/latest)
 
+Windows MSIX zip contains the package and install notes. If release signing secrets are not configured, the zip also includes a temporary `VoiSER-signing.cer` certificate for sideload install.
+
 ## Repository Layout
 
 - `apps/macos` — production macOS app (Swift + AppKit/SwiftUI + WhisperKit)

@@ -27,5 +27,8 @@ git push origin v1.0.0
 
 ## Troubleshooting
 
-- If Windows MSIX is unavailable on a runner, workflow publishes `VoiSER-Windows-msix.zip` with a notice file.
-- Check workflow logs in Actions for packaging toolchain details.
+- Windows MSIX build is now required; release fails if a real `.msix/.appx/.msixbundle` is not produced.
+- For trusted publisher installs, configure GitHub secrets:
+  - `WINDOWS_PFX_BASE64` (base64-encoded `.pfx`)
+  - `WINDOWS_PFX_PASSWORD`
+- If secrets are absent, workflow generates a temporary self-signed cert and includes `VoiSER-signing.cer` in the MSIX zip.

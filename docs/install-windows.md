@@ -11,7 +11,8 @@ dotnet test
 
 ## Run packaged app
 
-- **MSIX**: install from GitHub Releases package.
+- **MSIX**: unzip `VoiSER-Windows-msix.zip`, then run the `.msix` package inside.
+  - If publisher is untrusted, install `VoiSER-signing.cer` to `Local Machine -> Trusted People` and retry.
 - **Portable ZIP**: unzip and run `VoiSER.Windows.App.exe`.
 
 ## Notes
