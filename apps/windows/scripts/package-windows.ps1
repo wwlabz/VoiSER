@@ -137,8 +137,42 @@ $launcherPath = Join-Path $packageDir "VoiSER.cmd"
 @echo off
 setlocal
 set "ROOT=%~dp0"
-start "" "%ROOT%app\VoiSER.Windows.App.exe" %*
+start "" /D "%ROOT%app" "%ROOT%app\VoiSER.Windows.App.exe" %*
 "@ | Out-File -FilePath $launcherPath -Encoding ascii
+
+$debugLauncherPath = Join-Path $packageDir "VoiSER-debug.cmd"
+@"
+@echo off
+setlocal
+set "ROOT=%~dp0"
+set "APPDIR=%ROOT%app"
+set "EXE=%APPDIR%\VoiSER.Windows.App.exe"
+set "LOGDIR=%LOCALAPPDATA%\VoiSER\logs"
+if not exist "%LOGDIR%" mkdir "%LOGDIR%" >nul 2>&1
+set "LOGFILE=%LOGDIR%\portable-launcher.log"
+
+echo [%date% %time%] Launch request: "%EXE%" >> "%LOGFILE%"
+if not exist "%EXE%" (
+  echo ERROR: missing executable "%EXE%"
+  echo [%date% %time%] ERROR: executable missing >> "%LOGFILE%"
+  pause
+  exit /b 1
+)
+
+pushd "%APPDIR%"
+".\VoiSER.Windows.App.exe" %*
+set "EXITCODE=%ERRORLEVEL%"
+popd
+
+echo [%date% %time%] Exit code: %EXITCODE% >> "%LOGFILE%"
+if not "%EXITCODE%"=="0" (
+  echo.
+  echo VoiSER terminated with error code %EXITCODE%.
+  echo Check log file: "%LOGFILE%"
+  pause
+)
+exit /b %EXITCODE%
+"@ | Out-File -FilePath $debugLauncherPath -Encoding ascii
 
 $readmePath = Join-Path $packageDir "README-portable.txt"
 @"
@@ -147,6 +181,9 @@ VoiSER Windows Portable
 1. Extract this ZIP to any folder.
 2. Launch VoiSER using VoiSER.cmd
    (or run app\VoiSER.Windows.App.exe directly).
+3. If startup fails, run VoiSER-debug.cmd and share:
+   - %LOCALAPPDATA%\VoiSER\logs\portable-launcher.log
+   - %LOCALAPPDATA%\VoiSER\logs\startup.log
 "@ | Out-File -FilePath $readmePath -Encoding utf8
 
 Compress-Archive -Path "$packageDir\*" -DestinationPath (Join-Path $out "VoiSER-Windows-portable.zip")

@@ -19,56 +19,76 @@ public sealed partial class MainWindow : Window
     private AppSettings _settings = new();
     private bool _isRecording;
     private bool _isCapturingSingleKey;
+    private bool _isUiReady;
 
     public MainWindow()
     {
-        InitializeComponent();
+        try
+        {
+            _settingsStore = new JsonSettingsStore();
+            _modelManager = new ModelManager();
+            _hotkeyService = new HotkeyService();
+            _audioCaptureService = new NAudioCaptureService();
+            _transcriptionService = new WhisperTranscriptionService(_modelManager);
+            _textOutputService = new TextOutputService();
 
-        _settingsStore = new JsonSettingsStore();
-        _modelManager = new ModelManager();
-        _hotkeyService = new HotkeyService();
-        _audioCaptureService = new NAudioCaptureService();
-        _transcriptionService = new WhisperTranscriptionService(_modelManager);
-        _textOutputService = new TextOutputService();
+            InitializeComponent();
 
-        _hotkeyService.Triggered += () => DispatcherQueue.TryEnqueue(() => _ = ToggleCaptureAsync());
+            _hotkeyService.Triggered += () => DispatcherQueue.TryEnqueue(() => _ = ToggleCaptureAsync());
 
-        _ = InitializeAsync();
+            _ = InitializeAsync();
+        }
+        catch (Exception ex)
+        {
+            StartupDiagnostics.WriteException("MainWindow constructor failed", ex);
+            throw;
+        }
     }
 
     private async Task InitializeAsync()
     {
-        _settings = await _settingsStore.LoadAsync();
-
-        OutputModes.SelectedIndex = _settings.TextOutputMode switch
+        try
         {
-            TextOutputMode.Clipboard => 0,
-            TextOutputMode.PasteAtCursor => 1,
-            TextOutputMode.PasteStrict => 2,
-            _ => 0,
-        };
+            _isUiReady = false;
+            _settings = await _settingsStore.LoadAsync();
 
-        var variants = new[] { "tiny", "base", "small", "medium" };
-        ModelVariantCombo.SelectedIndex = Array.IndexOf(variants, _settings.ModelVariant);
-        if (ModelVariantCombo.SelectedIndex < 0) ModelVariantCombo.SelectedIndex = 2;
+            OutputModes.SelectedIndex = _settings.TextOutputMode switch
+            {
+                TextOutputMode.Clipboard => 0,
+                TextOutputMode.PasteAtCursor => 1,
+                TextOutputMode.PasteStrict => 2,
+                _ => 0,
+            };
 
-        LaunchAtStartup.IsChecked = _settings.LaunchAtStartup;
-        WidgetEnabled.IsChecked = true;
+            var variants = new[] { "tiny", "base", "small", "medium" };
+            ModelVariantCombo.SelectedIndex = Array.IndexOf(variants, _settings.ModelVariant);
+            if (ModelVariantCombo.SelectedIndex < 0) ModelVariantCombo.SelectedIndex = 2;
 
-        SingleKeyEnabled.IsChecked = _settings.ExclusiveSingleKeyEnabled;
-        SingleKeyBlock.IsChecked = _settings.ExclusiveSingleKeyBlocksSystemDelivery;
-        SingleKeyLabel.Text = FormatScanCode(_settings.ExclusiveSingleKeyCode);
+            LaunchAtStartup.IsChecked = _settings.LaunchAtStartup;
+            WidgetEnabled.IsChecked = true;
 
-        ComboKeyCode.Value = _settings.ComboHotkey.KeyCode;
-        ComboAlt.IsChecked = _settings.ComboHotkey.Modifiers.HasFlag(HotkeyModifiers.Alt);
-        ComboCtrl.IsChecked = _settings.ComboHotkey.Modifiers.HasFlag(HotkeyModifiers.Control);
-        ComboShift.IsChecked = _settings.ComboHotkey.Modifiers.HasFlag(HotkeyModifiers.Shift);
-        ComboWin.IsChecked = _settings.ComboHotkey.Modifiers.HasFlag(HotkeyModifiers.Win);
+            SingleKeyEnabled.IsChecked = _settings.ExclusiveSingleKeyEnabled;
+            SingleKeyBlock.IsChecked = _settings.ExclusiveSingleKeyBlocksSystemDelivery;
+            SingleKeyLabel.Text = FormatScanCode(_settings.ExclusiveSingleKeyCode);
 
-        ApplyHotkeyConfig();
-        AppendLog("Инициализация завершена");
+            ComboKeyCode.Value = _settings.ComboHotkey.KeyCode;
+            ComboAlt.IsChecked = _settings.ComboHotkey.Modifiers.HasFlag(HotkeyModifiers.Alt);
+            ComboCtrl.IsChecked = _settings.ComboHotkey.Modifiers.HasFlag(HotkeyModifiers.Control);
+            ComboShift.IsChecked = _settings.ComboHotkey.Modifiers.HasFlag(HotkeyModifiers.Shift);
+            ComboWin.IsChecked = _settings.ComboHotkey.Modifiers.HasFlag(HotkeyModifiers.Win);
 
-        await EnsureModelReadyOnStartupAsync();
+            ApplyHotkeyConfig();
+            _isUiReady = true;
+            AppendLog("Инициализация завершена");
+
+            await EnsureModelReadyOnStartupAsync();
+        }
+        catch (Exception ex)
+        {
+            StartupDiagnostics.WriteException("MainWindow.InitializeAsync failed", ex);
+            AppendLog($"Критическая ошибка инициализации: {ex.Message}");
+            StateLabel.Text = "Состояние: Failed";
+        }
     }
 
     private async Task EnsureModelReadyOnStartupAsync()
@@ -137,6 +157,11 @@ public sealed partial class MainWindow : Window
 
     private async void OnOutputModeChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (!_isUiReady)
+        {
+            return;
+        }
+
         _settings.TextOutputMode = OutputModes.SelectedIndex switch
         {
             1 => TextOutputMode.PasteAtCursor,
@@ -148,6 +173,11 @@ public sealed partial class MainWindow : Window
 
     private async void OnModelVariantChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (!_isUiReady)
+        {
+            return;
+        }
+
         if (ModelVariantCombo.SelectedItem is ComboBoxItem item && item.Content is string variant)
         {
             _settings.ModelVariant = variant;
@@ -191,6 +221,11 @@ public sealed partial class MainWindow : Window
 
     private async void OnSingleKeyConfigChanged(object sender, RoutedEventArgs e)
     {
+        if (!_isUiReady)
+        {
+            return;
+        }
+
         _settings.ExclusiveSingleKeyEnabled = SingleKeyEnabled.IsChecked == true;
         _settings.ExclusiveSingleKeyBlocksSystemDelivery = SingleKeyBlock.IsChecked == true;
         ApplyHotkeyConfig();
@@ -199,11 +234,21 @@ public sealed partial class MainWindow : Window
 
     private async void OnComboKeyCodeChanged(NumberBox sender, NumberBoxValueChangedEventArgs e)
     {
+        if (!_isUiReady)
+        {
+            return;
+        }
+
         await SaveComboHotkeyFromControlsAsync();
     }
 
     private async void OnComboModifiersChanged(object sender, RoutedEventArgs e)
     {
+        if (!_isUiReady)
+        {
+            return;
+        }
+
         await SaveComboHotkeyFromControlsAsync();
     }
 
@@ -215,13 +260,26 @@ public sealed partial class MainWindow : Window
         if (ComboShift.IsChecked == true) modifiers |= HotkeyModifiers.Shift;
         if (ComboWin.IsChecked == true) modifiers |= HotkeyModifiers.Win;
 
-        _settings.ComboHotkey = new HotkeyCombo((int)ComboKeyCode.Value, modifiers);
+        var keyCodeValue = ComboKeyCode.Value;
+        if (double.IsNaN(keyCodeValue) || double.IsInfinity(keyCodeValue))
+        {
+            AppendLog("Неверное значение VK-кода хоткея");
+            return;
+        }
+
+        var keyCode = (int)Math.Clamp(keyCodeValue, 1, 255);
+        _settings.ComboHotkey = new HotkeyCombo(keyCode, modifiers);
         ApplyHotkeyConfig();
         await _settingsStore.SaveAsync(_settings);
     }
 
     private async void OnBehaviorChanged(object sender, RoutedEventArgs e)
     {
+        if (!_isUiReady)
+        {
+            return;
+        }
+
         _settings.LaunchAtStartup = LaunchAtStartup.IsChecked == true;
         await _settingsStore.SaveAsync(_settings);
     }
