@@ -43,16 +43,16 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           cd apps/windows
-          dotnet restore VoiSER.Windows.sln
+          dotnet restore tests/VoiSER.Windows.Tests/VoiSER.Windows.Tests.csproj
 
       - name: Dotnet test (Windows)
         if: runner.os == 'Windows'
         run: |
           cd apps/windows
-          dotnet test VoiSER.Windows.sln -c Release --no-restore
+          dotnet test tests/VoiSER.Windows.Tests/VoiSER.Windows.Tests.csproj -c Release --no-restore
 
       - name: Dotnet build app (Windows)
         if: runner.os == 'Windows'
         run: |
           cd apps/windows
-          dotnet build src/VoiSER.Windows.App/VoiSER.Windows.App.csproj -c Release --no-restore
+          dotnet build src/VoiSER.Windows.App/VoiSER.Windows.App.csproj -c Release

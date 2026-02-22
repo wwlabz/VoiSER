@@ -17,7 +17,7 @@ jobs:
       - name: Build macOS app
         run: |
           cd apps/macos
-          ./scripts/package-app.sh
+          SIGN_APP=0 ./scripts/package-app.sh
 
       - name: Zip macOS app
         run: |
@@ -43,8 +43,8 @@ jobs:
         shell: pwsh
         run: |
           Set-Location apps/windows
-          dotnet restore VoiSER.Windows.sln
-          dotnet test VoiSER.Windows.sln -c Release --no-restore
+          dotnet restore tests/VoiSER.Windows.Tests/VoiSER.Windows.Tests.csproj
+          dotnet test tests/VoiSER.Windows.Tests/VoiSER.Windows.Tests.csproj -c Release --no-restore
 
       - name: Build portable zip
         shell: pwsh
