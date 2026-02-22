@@ -59,6 +59,8 @@ jobs:
         shell: pwsh
         run: |
           Set-Location apps/windows
+          $artifacts = Join-Path (Get-Location) "artifacts"
+          New-Item -ItemType Directory -Force -Path $artifacts | Out-Null
           $portable = Join-Path (Get-Location) "artifacts/VoiSER-Windows-portable.zip"
           if (!(Test-Path $portable)) {
             "Portable build artifact was not produced on this runner." | Out-File -Encoding utf8 (Join-Path (Get-Location) "artifacts/PORTABLE-NOTICE.txt")
@@ -89,6 +91,8 @@ jobs:
         shell: pwsh
         run: |
           Set-Location apps/windows
+          $artifacts = Join-Path (Get-Location) "artifacts"
+          New-Item -ItemType Directory -Force -Path $artifacts | Out-Null
           $msixZip = Join-Path (Get-Location) "artifacts/VoiSER-Windows-msix.zip"
           if (!(Test-Path $msixZip)) {
             "MSIX package was not produced on this runner." | Out-File -Encoding utf8 (Join-Path (Get-Location) "artifacts/MSIX-NOTICE.txt")
