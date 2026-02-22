@@ -6,20 +6,22 @@ $out = Join-Path $root "artifacts"
 if (Test-Path $out) { Remove-Item $out -Recurse -Force }
 New-Item -ItemType Directory -Path $out | Out-Null
 
-# Portable build (real runnable app, not placeholder)
 $publishDir = Join-Path $out "portable"
 New-Item -ItemType Directory -Path $publishDir | Out-Null
 
-$project = ".\src\VoiSER.Windows.App\VoiSER.Windows.App.csproj"
-$exePath = Join-Path $publishDir "VoiSER.Windows.App.exe"
+$project = ".\\src\\VoiSER.Windows.App\\VoiSER.Windows.App.csproj"
+$exeName = "VoiSER.Windows.App.exe"
+$exePath = Join-Path $publishDir $exeName
 
-function Invoke-DotnetChecked {
+function Invoke-Checked {
   param(
+    [Parameter(Mandatory = $true)]
+    [string]$Command,
     [Parameter(Mandatory = $true)]
     [string[]]$Args
   )
 
-  $output = & dotnet @Args 2>&1
+  $output = & $Command @Args 2>&1
   $exitCode = $LASTEXITCODE
 
   if ($null -ne $output) {
@@ -32,100 +34,63 @@ function Invoke-DotnetChecked {
     if ($null -ne $output) {
       $interesting = $output |
         Select-String -Pattern 'error|failed|MSB[0-9]{4}|NU[0-9]{4}' -CaseSensitive:$false |
-        Select-Object -ExpandProperty Line -First 30
+        Select-Object -ExpandProperty Line -First 60
 
-      if ($null -eq $interesting -or $interesting.Count -eq 0) {
-        $interesting = $output | Select-Object -Last 30
+      $tail = $output | Select-Object -Last 60
+      if ($tail) {
+        $interesting += $tail
       }
     }
 
     if ($null -eq $interesting -or $interesting.Count -eq 0) {
-      $interesting = @("dotnet command failed without output")
+      $interesting = @("$Command failed without output")
     }
+
+    $interesting = $interesting | Select-Object -Unique
 
     foreach ($line in $interesting) {
       $msg = $line.ToString().Replace("`r", " ").Replace("`n", " ")
       Write-Host "::error title=Windows package::$msg"
     }
 
-    throw "dotnet command failed (exit $exitCode): dotnet $($Args -join ' ')"
+    throw "command failed (exit $exitCode): $Command $($Args -join ' ')"
   }
 }
 
-$portableBuilt = $false
-
-$attempts = @(
-  @(
-    "publish", $project,
-    "-c", "Release",
-    "-r", "win-x64",
-    "--self-contained", "true",
-    "-p:WindowsPackageType=None",
-    "-p:WindowsAppSDKSelfContained=true",
-    "-p:EnableMsixTooling=false",
-    "-p:GenerateAppxPackageOnBuild=false",
-    "-o", $publishDir
-  ),
-  @(
-    "publish", $project,
-    "-c", "Release",
-    "-r", "win-x64",
-    "--self-contained", "false",
-    "-p:WindowsPackageType=None",
-    "-p:EnableMsixTooling=false",
-    "-p:GenerateAppxPackageOnBuild=false",
-    "-o", $publishDir
-  )
+Invoke-Checked -Command "msbuild" -Args @(
+  $project,
+  "/restore",
+  "/p:Configuration=Release",
+  "/p:Platform=x64",
+  "/p:RuntimeIdentifier=win-x64",
+  "/p:WindowsPackageType=None",
+  "/p:EnableMsixTooling=false",
+  "/p:GenerateAppxPackageOnBuild=false",
+  "/p:UapAppxPackageBuildMode=None",
+  "/p:AppxBundle=Never"
 )
 
-foreach ($args in $attempts) {
-  if (Test-Path $publishDir) {
-    Remove-Item $publishDir -Recurse -Force
-  }
-  New-Item -ItemType Directory -Path $publishDir | Out-Null
+$buildOutputRoot = Join-Path $root "src/VoiSER.Windows.App/bin/Release"
+$buildExe = Get-ChildItem -Path $buildOutputRoot -Recurse -Filter $exeName -File -ErrorAction SilentlyContinue |
+  Where-Object { $_.FullName -match "win-x64" } |
+  Select-Object -First 1
 
-  try {
-    Invoke-DotnetChecked -Args $args
-    if (Test-Path $exePath) {
-      $portableBuilt = $true
-      break
-    }
-  }
-  catch {
-    Write-Warning $_
-  }
-}
-
-if (-not $portableBuilt) {
-  # Fallback: package build output when publish mode is unavailable on runner.
-  Invoke-DotnetChecked -Args @(
-    "build", $project,
-    "-c", "Release",
-    "-p:WindowsPackageType=None",
-    "-p:EnableMsixTooling=false",
-    "-p:GenerateAppxPackageOnBuild=false"
-  )
-
-  $buildOutputRoot = Join-Path $root "src/VoiSER.Windows.App/bin/Release"
-  $buildExe = Get-ChildItem -Path $buildOutputRoot -Recurse -Filter "VoiSER.Windows.App.exe" -File -ErrorAction SilentlyContinue |
+if ($null -eq $buildExe) {
+  $buildExe = Get-ChildItem -Path $buildOutputRoot -Recurse -Filter $exeName -File -ErrorAction SilentlyContinue |
     Select-Object -First 1
-
-  if ($null -eq $buildExe) {
-    throw "Portable package build failed: publish and build outputs did not produce VoiSER.Windows.App.exe"
-  }
-
-  Copy-Item -Path (Join-Path $buildExe.Directory.FullName "*") -Destination $publishDir -Recurse -Force
-
-  if (Test-Path $exePath) {
-    $portableBuilt = $true
-  }
 }
 
-if (-not $portableBuilt) {
+if ($null -eq $buildExe) {
+  throw "Portable package build failed: could not find $exeName under $buildOutputRoot"
+}
+
+Copy-Item -Path (Join-Path $buildExe.Directory.FullName "*") -Destination $publishDir -Recurse -Force
+
+if (-not (Test-Path $exePath)) {
   throw "Portable package build failed: $exePath was not produced."
 }
 
 Compress-Archive -Path "$publishDir\*" -DestinationPath (Join-Path $out "VoiSER-Windows-portable.zip")
+Write-Host "Portable ZIP created: $(Join-Path $out 'VoiSER-Windows-portable.zip')"
 
-# MSIX package placeholder path (depends on Windows SDK/MSIX tooling on runner)
-Write-Host "MSIX build should be generated by CI release workflow using MSBuild packaging switches."
+# MSIX package remains in release workflow (best effort).
