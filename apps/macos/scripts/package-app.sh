@@ -39,8 +39,16 @@ else
 fi
 
 echo "[1/6] Building $APP_NAME ($BUILD_CONFIG)..."
-BUILD_DIR="$(swift build -c "$BUILD_CONFIG" --product "$APP_NAME" --show-bin-path)"
+swift build -c "$BUILD_CONFIG" --product "$APP_NAME"
+BUILD_DIR="$(swift build -c "$BUILD_CONFIG" --show-bin-path)"
 BINARY_PATH="$BUILD_DIR/$APP_NAME"
+
+if [[ ! -x "$BINARY_PATH" ]]; then
+  ALT_BINARY_PATH="$BUILD_DIR/VoiceWidget"
+  if [[ -x "$ALT_BINARY_PATH" ]]; then
+    BINARY_PATH="$ALT_BINARY_PATH"
+  fi
+fi
 
 if [[ ! -x "$BINARY_PATH" ]]; then
   echo "Unable to find built binary at $BINARY_PATH" >&2
