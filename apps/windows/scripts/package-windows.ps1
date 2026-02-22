@@ -91,38 +91,27 @@ Write-Host "Using MSBuild: $msbuildPath"
 
 Invoke-Checked -Command $msbuildPath -Args @(
   $project,
-  "/restore",
+  "/t:Restore,Publish",
   "/p:Configuration=Release",
   "/p:Platform=x64",
   "/p:RuntimeIdentifier=win-x64",
+  "/p:SelfContained=true",
+  "/p:WindowsAppSDKSelfContained=true",
   "/p:WindowsPackageType=None",
   "/p:EnableMsixTooling=false",
   "/p:GenerateAppxPackageOnBuild=false",
   "/p:UapAppxPackageBuildMode=None",
-  "/p:AppxBundle=Never"
+  "/p:AppxBundle=Never",
+  "/p:PublishSingleFile=false",
+  "/p:PublishTrimmed=false",
+  "/p:PublishDir=$($publishDir)\"
 )
 
-$buildOutputRoot = Join-Path $root "src/VoiSER.Windows.App/bin"
-$buildExe = Get-ChildItem -Path $buildOutputRoot -Recurse -Filter $exeName -File -ErrorAction SilentlyContinue |
-  Where-Object { $_.FullName -match "win-x64" } |
-  Select-Object -First 1
-
-if ($null -eq $buildExe) {
-  $buildExe = Get-ChildItem -Path $buildOutputRoot -Recurse -Filter $exeName -File -ErrorAction SilentlyContinue |
-    Select-Object -First 1
-}
-
-if ($null -eq $buildExe) {
-  throw "Portable package build failed: could not find $exeName under $buildOutputRoot"
-}
-
-Copy-Item -Path (Join-Path $buildExe.Directory.FullName "*") -Destination $publishDir -Recurse -Force
-
 if (-not (Test-Path $exePath)) {
-  throw "Portable package build failed: $exePath was not produced."
+  throw "Portable self-contained publish failed: $exePath was not produced."
 }
 
 Compress-Archive -Path "$publishDir\*" -DestinationPath (Join-Path $out "VoiSER-Windows-portable.zip")
 Write-Host "Portable ZIP created: $(Join-Path $out 'VoiSER-Windows-portable.zip')"
 
-# MSIX package remains in release workflow (best effort).
+# MSIX package is built in a dedicated release workflow step.

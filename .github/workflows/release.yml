@@ -65,8 +65,17 @@ jobs:
           }
 
           $size = (Get-Item $portable).Length
-          if ($size -lt 102400) {
-            throw "Portable ZIP is unexpectedly small ($size bytes), aborting release."
+          if ($size -lt 31457280) {
+            throw "Portable ZIP is too small for self-contained build ($size bytes), aborting release."
+          }
+
+          $extract = Join-Path $env:RUNNER_TEMP "portable-validate"
+          if (Test-Path $extract) { Remove-Item $extract -Recurse -Force }
+          Expand-Archive -Path $portable -DestinationPath $extract -Force
+
+          $runtimeMarker = Join-Path $extract "Microsoft.WindowsAppRuntime.dll"
+          if (!(Test-Path $runtimeMarker)) {
+            throw "Portable ZIP is missing Microsoft.WindowsAppRuntime.dll (self-contained runtime not included)."
           }
 
       - name: Build MSIX package

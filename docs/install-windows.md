@@ -14,6 +14,7 @@ dotnet test
 - **MSIX**: unzip `VoiSER-Windows-msix.zip`, then run the `.msix` package inside.
   - If publisher is untrusted, install `VoiSER-signing.cer` to `Local Machine -> Trusted People` and retry.
 - **Portable ZIP**: unzip and run `VoiSER.Windows.App.exe`.
+  - Portable build is self-contained and does not require separate Windows App Runtime installation.
 
 ## Notes
 
