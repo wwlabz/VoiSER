@@ -1,4 +1,10 @@
 $ErrorActionPreference = "Stop"
+trap {
+  $msg = $_.Exception.Message.Replace("`r", " ").Replace("`n", " ")
+  Write-Host "::error title=Windows package fatal::$msg"
+  exit 1
+}
+
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
@@ -38,8 +44,14 @@ function Invoke-Checked {
     [string[]]$Args
   )
 
-  $output = & $Command @Args 2>&1
-  $exitCode = $LASTEXITCODE
+  try {
+    $output = & $Command @Args 2>&1
+    $exitCode = $LASTEXITCODE
+  }
+  catch {
+    $output = @($_.Exception.Message)
+    $exitCode = 1
+  }
 
   if ($null -ne $output) {
     $output | ForEach-Object { Write-Host $_ }
@@ -90,7 +102,7 @@ Invoke-Checked -Command $msbuildPath -Args @(
   "/p:AppxBundle=Never"
 )
 
-$buildOutputRoot = Join-Path $root "src/VoiSER.Windows.App/bin/Release"
+$buildOutputRoot = Join-Path $root "src/VoiSER.Windows.App/bin"
 $buildExe = Get-ChildItem -Path $buildOutputRoot -Recurse -Filter $exeName -File -ErrorAction SilentlyContinue |
   Where-Object { $_.FullName -match "win-x64" } |
   Select-Object -First 1
