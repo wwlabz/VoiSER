@@ -48,23 +48,23 @@ jobs:
           dotnet test tests/VoiSER.Windows.Tests/VoiSER.Windows.Tests.csproj -c Release --no-restore
 
       - name: Build portable zip
-        continue-on-error: true
         shell: pwsh
         run: |
           Set-Location apps/windows
           ./scripts/package-windows.ps1
 
-      - name: Ensure portable zip exists
-        if: always()
+      - name: Validate portable zip
         shell: pwsh
         run: |
           Set-Location apps/windows
-          $artifacts = Join-Path (Get-Location) "artifacts"
-          New-Item -ItemType Directory -Force -Path $artifacts | Out-Null
           $portable = Join-Path (Get-Location) "artifacts/VoiSER-Windows-portable.zip"
           if (!(Test-Path $portable)) {
-            "Portable build artifact was not produced on this runner." | Out-File -Encoding utf8 (Join-Path (Get-Location) "artifacts/PORTABLE-NOTICE.txt")
-            Compress-Archive -Path (Join-Path (Get-Location) "artifacts/PORTABLE-NOTICE.txt") -DestinationPath $portable -Force
+            throw "Portable ZIP was not produced: $portable"
+          }
+
+          $size = (Get-Item $portable).Length
+          if ($size -lt 102400) {
+            throw "Portable ZIP is unexpectedly small ($size bytes), aborting release."
           }
 
       - name: Build MSIX (best effort)

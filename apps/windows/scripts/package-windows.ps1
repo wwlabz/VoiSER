@@ -6,9 +6,69 @@ $out = Join-Path $root "artifacts"
 if (Test-Path $out) { Remove-Item $out -Recurse -Force }
 New-Item -ItemType Directory -Path $out | Out-Null
 
-# Portable build
+# Portable build (real runnable app, not placeholder)
 $publishDir = Join-Path $out "portable"
-dotnet publish .\src\VoiSER.Windows.App\VoiSER.Windows.App.csproj -c Release -r win-x64 --self-contained false -o $publishDir
+New-Item -ItemType Directory -Path $publishDir | Out-Null
+
+$project = ".\src\VoiSER.Windows.App\VoiSER.Windows.App.csproj"
+$exePath = Join-Path $publishDir "VoiSER.Windows.App.exe"
+
+function Invoke-DotnetChecked {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string[]]$Args
+  )
+
+  & dotnet @Args
+  if ($LASTEXITCODE -ne 0) {
+    throw "dotnet command failed: dotnet $($Args -join ' ')"
+  }
+}
+
+$portableBuilt = $false
+
+$attempts = @(
+  @(
+    "publish", $project,
+    "-c", "Release",
+    "-r", "win-x64",
+    "--self-contained", "true",
+    "-p:WindowsPackageType=None",
+    "-p:WindowsAppSDKSelfContained=true",
+    "-o", $publishDir
+  ),
+  @(
+    "publish", $project,
+    "-c", "Release",
+    "-r", "win-x64",
+    "--self-contained", "false",
+    "-p:WindowsPackageType=None",
+    "-o", $publishDir
+  )
+)
+
+foreach ($args in $attempts) {
+  if (Test-Path $publishDir) {
+    Remove-Item $publishDir -Recurse -Force
+  }
+  New-Item -ItemType Directory -Path $publishDir | Out-Null
+
+  try {
+    Invoke-DotnetChecked -Args $args
+    if (Test-Path $exePath) {
+      $portableBuilt = $true
+      break
+    }
+  }
+  catch {
+    Write-Warning $_
+  }
+}
+
+if (-not $portableBuilt) {
+  throw "Portable package build failed: $exePath was not produced."
+}
+
 Compress-Archive -Path "$publishDir\*" -DestinationPath (Join-Path $out "VoiSER-Windows-portable.zip")
 
 # MSIX package placeholder path (depends on Windows SDK/MSIX tooling on runner)
