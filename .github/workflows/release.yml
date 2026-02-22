@@ -64,8 +64,15 @@ jobs:
           $output | Tee-Object -FilePath $log
 
           if ($exitCode -ne 0) {
-            $tail = Get-Content $log -Tail 80
-            foreach ($line in $tail) {
+            $interesting = Get-Content $log |
+              Select-String -Pattern 'error|failed|MSB[0-9]{4}|NU[0-9]{4}' -CaseSensitive:$false |
+              Select-Object -ExpandProperty Line -First 40
+
+            if ($null -eq $interesting -or $interesting.Count -eq 0) {
+              $interesting = Get-Content $log -Tail 30
+            }
+
+            foreach ($line in $interesting) {
               $msg = $line.ToString().Replace("`r", " ").Replace("`n", " ")
               Write-Host "::error title=Build Windows app::$msg"
             }
