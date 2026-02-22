@@ -52,32 +52,47 @@ jobs:
       - name: Build Windows app
         shell: pwsh
         run: |
-          Set-Location apps/windows
-          $artifacts = Join-Path (Get-Location) "artifacts"
-          New-Item -ItemType Directory -Force -Path $artifacts | Out-Null
+          try {
+            Set-Location apps/windows
+            $artifacts = Join-Path (Get-Location) "artifacts"
+            New-Item -ItemType Directory -Force -Path $artifacts | Out-Null
 
-          $log = Join-Path $artifacts "build-windows.log"
-
-          $output = & msbuild .\src\VoiSER.Windows.App\VoiSER.Windows.App.csproj /t:Restore,Build /p:Configuration=Release /p:Platform=x64 /p:WindowsPackageType=None /p:EnableMsixTooling=false /p:GenerateAppxPackageOnBuild=false 2>&1
-          $exitCode = $LASTEXITCODE
-
-          $output | Tee-Object -FilePath $log
-
-          if ($exitCode -ne 0) {
-            $interesting = Get-Content $log |
-              Select-String -Pattern 'error|failed|MSB[0-9]{4}|NU[0-9]{4}' -CaseSensitive:$false |
-              Select-Object -ExpandProperty Line -First 40
-
-            if ($null -eq $interesting -or $interesting.Count -eq 0) {
-              $interesting = Get-Content $log -Tail 30
+            $log = Join-Path $artifacts "build-windows.log"
+            if (Test-Path $log) {
+              Remove-Item -Force $log
             }
 
-            foreach ($line in $interesting) {
-              $msg = $line.ToString().Replace("`r", " ").Replace("`n", " ")
-              Write-Host "::error title=Build Windows app::$msg"
-            }
+            & msbuild .\src\VoiSER.Windows.App\VoiSER.Windows.App.csproj /t:Restore,Build /p:Configuration=Release /p:Platform=x64 /p:WindowsPackageType=None /p:EnableMsixTooling=false /p:GenerateAppxPackageOnBuild=false *>&1 | Tee-Object -FilePath $log
+            $exitCode = $LASTEXITCODE
 
-            throw "Build Windows app failed with exit code $exitCode"
+            if ($exitCode -ne 0) {
+              $interesting = @()
+              if (Test-Path $log) {
+                $interesting = Get-Content $log |
+                  Select-String -Pattern 'error|failed|MSB[0-9]{4}|NU[0-9]{4}' -CaseSensitive:$false |
+                  Select-Object -ExpandProperty Line -First 40
+
+                if ($null -eq $interesting -or $interesting.Count -eq 0) {
+                  $interesting = Get-Content $log -Tail 40
+                }
+              }
+
+              if ($null -eq $interesting -or $interesting.Count -eq 0) {
+                $interesting = @("Build Windows app failed with exit code $exitCode and empty log output")
+              }
+
+              foreach ($line in $interesting) {
+                $msg = $line.ToString().Replace("`r", " ").Replace("`n", " ")
+                Write-Host "::error title=Build Windows app::$msg"
+              }
+
+              throw "Build Windows app failed with exit code $exitCode"
+            }
+          }
+          catch {
+            $err = $_.Exception.Message
+            Write-Host "::error title=Build Windows app exception::$err"
+            throw
           }
 
       - name: Build portable zip
