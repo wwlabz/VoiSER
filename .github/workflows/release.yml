@@ -1,0 +1,106 @@
+name: Release
+
+permissions:
+  contents: write
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build macOS app
+        run: |
+          cd apps/macos
+          ./scripts/package-app.sh
+
+      - name: Zip macOS app
+        run: |
+          mkdir -p artifacts
+          ditto -c -k --sequesterRsrc --keepParent apps/macos/dist/VoiSER.app artifacts/VoiSER-macOS.zip
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VoiSER-macOS
+          path: artifacts/VoiSER-macOS.zip
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore and test
+        shell: pwsh
+        run: |
+          Set-Location apps/windows
+          dotnet restore VoiSER.Windows.sln
+          dotnet test VoiSER.Windows.sln -c Release --no-restore
+
+      - name: Build portable zip
+        shell: pwsh
+        run: |
+          Set-Location apps/windows
+          ./scripts/package-windows.ps1
+
+      - name: Build MSIX (best effort)
+        shell: pwsh
+        run: |
+          Set-Location apps/windows
+          $out = Join-Path (Get-Location) "artifacts/msix"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+
+          dotnet msbuild .\src\VoiSER.Windows.App\VoiSER.Windows.App.csproj /t:Restore,Build /p:Configuration=Release /p:GenerateAppxPackageOnBuild=true /p:AppxBundle=Never /p:AppxPackageDir="$out\\" || $true
+
+          $msix = Get-ChildItem -Path $out -Recurse -Include *.msix,*.appx -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($null -ne $msix) {
+            Compress-Archive -Path $msix.FullName -DestinationPath (Join-Path (Get-Location) "artifacts/VoiSER-Windows-msix.zip") -Force
+          }
+          else {
+            "MSIX build artifact was not produced on this runner." | Out-File -Encoding utf8 (Join-Path (Get-Location) "artifacts/MSIX-NOTICE.txt")
+            Compress-Archive -Path (Join-Path (Get-Location) "artifacts/MSIX-NOTICE.txt") -DestinationPath (Join-Path (Get-Location) "artifacts/VoiSER-Windows-msix.zip") -Force
+          }
+
+      - name: Upload Windows portable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VoiSER-Windows-portable
+          path: apps/windows/artifacts/VoiSER-Windows-portable.zip
+
+      - name: Upload Windows msix artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VoiSER-Windows-msix
+          path: apps/windows/artifacts/VoiSER-Windows-msix.zip
+
+  publish-github-release:
+    runs-on: ubuntu-latest
+    needs: [build-macos, build-windows]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist-release
+
+      - name: Publish release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist-release/VoiSER-macOS/VoiSER-macOS.zip
+            dist-release/VoiSER-Windows-portable/VoiSER-Windows-portable.zip
+            dist-release/VoiSER-Windows-msix/VoiSER-Windows-msix.zip
+          generate_release_notes: true
+          body: |
+            ## VoiSER Multi-platform Release
+
+            - macOS artifact: `VoiSER-macOS.zip`
+            - Windows portable: `VoiSER-Windows-portable.zip`
+            - Windows package: `VoiSER-Windows-msix.zip`

@@ -1,21 +1,31 @@
 # Contributing
 
+## Repository structure
+
+- `apps/macos` — Swift macOS app
+- `apps/windows` — WinUI 3 Windows app
+
 ## Development setup
 
-1. `swift build`
-2. `scripts/embed-whisper-base.sh openai_whisper-small`
-3. `swift run VoiceWidget`
+### macOS
+
+1. `cd apps/macos`
+2. `swift build`
+3. `scripts/embed-whisper-base.sh openai_whisper-small` (optional, bundled model)
+4. `swift run VoiSER`
+
+### Windows
+
+1. `cd apps/windows`
+2. `dotnet restore VoiSER.Windows.sln`
+3. `dotnet build VoiSER.Windows.sln -c Release`
+4. `dotnet test VoiSER.Windows.sln -c Release`
 
 ## Pull requests
 
 - Keep PRs focused and small.
 - Include tests for behavior changes when possible.
-- Run before opening PR:
-
-```bash
-swift test
-swift build -c release --product VoiceWidget
-```
+- Run platform-appropriate tests before opening PR.
 
 ## Coding guidelines
 

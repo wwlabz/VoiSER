@@ -1,17 +1,19 @@
-# Third-Party Notices
+# Third-party notices
 
-VoiceWidget depends on the following third-party components:
+This project uses third-party open-source components.
+
+## macOS app
 
 - WhisperKit — https://github.com/argmaxinc/WhisperKit
 - KeyboardShortcuts — https://github.com/sindresorhus/KeyboardShortcuts
-- swift-transformers (transitive) — https://github.com/huggingface/swift-transformers
-- swift-jinja (transitive) — https://github.com/huggingface/swift-jinja
 - swift-collections (transitive) — https://github.com/apple/swift-collections
 - swift-argument-parser (transitive) — https://github.com/apple/swift-argument-parser
 
-Whisper model files are downloaded via script from:
+## Windows app
 
-- argmaxinc/whisperkit-coreml
-- openai/whisper-*
-
-Please review upstream licenses and terms for redistribution requirements.
+- Microsoft Windows App SDK — https://github.com/microsoft/WindowsAppSDK
+- CommunityToolkit.Mvvm — https://github.com/CommunityToolkit/dotnet
+- H.NotifyIcon.WinUI — https://github.com/HavenDV/H.NotifyIcon
+- NAudio — https://github.com/naudio/NAudio
+- whisper.net — https://github.com/sandrohanea/whisper.net
+- TextCopy — https://github.com/CopyText/TextCopy

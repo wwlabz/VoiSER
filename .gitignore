@@ -2,8 +2,11 @@
 .DS_Store
 .AppleDouble
 .LSOverride
+
+# IDE
 .vscode/
 .idea/
+.vs/
 
 # SwiftPM / Xcode build artifacts
 .build/
@@ -14,10 +17,15 @@ DerivedData/
 *.xcworkspace/
 xcuserdata/
 
-# Local app/release artifacts
-dist/
-*.app/
-*.dSYM/
+# macOS app local artifacts
+apps/macos/.build/
+apps/macos/dist/
+apps/macos/*.app/
+apps/macos/*.dSYM/
+
+# Windows .NET artifacts
+apps/windows/**/bin/
+apps/windows/**/obj/
 
 # Logs and temp
 *.log
@@ -29,7 +37,8 @@ dist/
 .env
 .env.*
 
-# Whisper model binaries are downloaded locally via script
-Sources/VoiceWidget/Resources/Models/*/
-!Sources/VoiceWidget/Resources/Models/.keep
-!Sources/VoiceWidget/Resources/Models/README.md
+# Downloaded local model binaries
+apps/macos/Sources/VoiceWidget/Resources/Models/*/
+!apps/macos/Sources/VoiceWidget/Resources/Models/.keep
+!apps/macos/Sources/VoiceWidget/Resources/Models/README.md
+apps/windows/.models/

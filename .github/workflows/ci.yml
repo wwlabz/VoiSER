@@ -6,20 +6,53 @@ on:
   pull_request:
 
 jobs:
-  test-and-build:
-    runs-on: macos-14
+  build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            name: macOS
+          - os: windows-latest
+            name: Windows
+    runs-on: ${{ matrix.os }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Select latest Xcode
-        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+      - name: Setup .NET
+        if: runner.os == 'Windows'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
 
-      - name: Swift version
-        run: swift --version
+      - name: Swift test (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          cd apps/macos
+          swift test
 
-      - name: Test
-        run: swift test
+      - name: Swift release build (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          cd apps/macos
+          swift build -c release --product VoiSER
 
-      - name: Release build
-        run: swift build -c release --product VoiSER
+      - name: Dotnet restore (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd apps/windows
+          dotnet restore VoiSER.Windows.sln
+
+      - name: Dotnet test (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd apps/windows
+          dotnet test VoiSER.Windows.sln -c Release --no-restore
+
+      - name: Dotnet build app (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd apps/windows
+          dotnet build src/VoiSER.Windows.App/VoiSER.Windows.App.csproj -c Release --no-restore

@@ -1,92 +1,51 @@
-# VoiSER (macOS)
+# VoiSER (macOS + Windows)
 
-Lightweight macOS voice widget with local Whisper transcription.
+VoiSER is a multi-platform voice input app with local transcription and smart text output.
 
-## Highlights
+## Repository Layout
 
-- Floating overlay widget over all windows/Spaces
-- Global hotkey to start/stop recording (`Option + Space` by default)
-- Local transcription via WhisperKit (no cloud API for transcription)
-- First-launch `Whisper Flow`: user confirms model download, sees progress, then grants permissions
-- Text output modes: clipboard, paste to active field, strict paste
-- Optional launch at login
-
-## Open-Source Ready
-
-- No model binaries committed to git
-- No hardcoded tokens, keys, or private endpoints
-- CI runs `swift test` and release build on macOS
-- Default app package is lightweight; model is fetched at runtime
-
-## Requirements
-
-- macOS 14+
-- Xcode 16+
-- Swift 6.1+
-- Internet access on first launch (for Whisper model download)
+- `apps/macos` — production macOS app (Swift + AppKit/SwiftUI + WhisperKit)
+- `apps/windows` — Windows app (WinUI 3 + local whisper.cpp via whisper.net)
+- `docs` — installation, permissions, architecture, release notes guidance
+- `scripts` — top-level orchestration scripts
 
 ## Quick Start
 
-1. Build:
+### macOS
 
 ```bash
-swift build
+./scripts/macos-test.sh
+./scripts/macos-package.sh
+./scripts/macos-install.sh
 ```
 
-2. Run:
+### Windows
 
-```bash
-swift run VoiSER
+```powershell
+cd apps/windows
+dotnet restore
+dotnet test
 ```
 
-3. On first launch:
-   - app opens `Whisper Flow`
-   - user clicks download for Whisper model
-   - app shows progress and completes setup
-   - app requests required permissions (microphone and system access as needed)
+## Downloads
 
-## Build `.app`
+Artifacts are published in GitHub Releases:
 
-```bash
-scripts/package-app.sh
-```
+- macOS app package
+- Windows MSIX package
+- Windows portable ZIP
 
-Output:
+## CI/CD
 
-- `dist/VoiSER.app`
+- Pull requests: matrix validation on macOS + Windows
+- Tags `v*`: cross-platform release artifacts are generated and attached
 
-By default, the packaged app does not include model binaries and stays small.
-Whisper model is installed automatically on first launch.
+## Documentation
 
-Optional bundled-model build (larger app bundle):
-
-```bash
-INCLUDE_BUNDLED_MODEL=1 MODEL_VARIANT=openai_whisper-small scripts/package-app.sh
-```
-
-## Install local app
-
-```bash
-scripts/install-app.sh
-```
-
-## Tests
-
-```bash
-swift test
-```
-
-## Privacy Notes
-
-- Audio is processed locally.
-- App requires microphone permission for recording.
-- Paste-to-active-field modes require Accessibility permission.
-- Whisper model files are downloaded from Hugging Face on first launch and stored in:
-  `~/Library/Application Support/VoiSER/Models`
-
-## Contributing
-
-Please read `CONTRIBUTING.md` and `SECURITY.md`.
+- `docs/install-macos.md`
+- `docs/install-windows.md`
+- `docs/permissions.md`
+- `docs/architecture.md`
 
 ## License
 
